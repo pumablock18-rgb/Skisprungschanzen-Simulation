@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIS Skisprungschanzen Geometrie-Editor (mit Flugkurve bis 500m)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        input[type=range] {
+            accent-color: #3b82f6;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 h-full flex flex-col overflow-hidden select-none">
+
+    <!-- Header / Navigation -->
+    <header class="bg-slate-900 border-b border-slate-800 px-6 py-3.5 flex items-center justify-between shrink-0 z-20 shadow-lg">
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-2.5 rounded-xl text-white font-black text-xl shadow-md border border-blue-400/30">
+                ⛷️
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                    FIS Schanzengeometrie-CAD <span class="text-xs bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 px-2 py-0.5 rounded-full font-medium">Inkl. Physik-Flugkurve (bis 500m)</span>
+                </h1>
+                <p class="text-xs text-slate-400">Dynamische Parabelberechnung vom Absprung bis K-Punkt/HS</p>
+            </div>
+        </div>
+
+        <!-- Presets Buttons -->
+        <div class="flex items-center space-x-2 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
+            <span class="text-xs text-slate-400 px-3 font-semibold uppercase tracking-wider">Schanzentyp:</span>
+            <button onclick="applyPreset('normal')" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-blue-600 hover:text-white text-slate-200 transition shadow-sm">
+                Normalschanze (HS 106)
+            </button>
+            <button onclick="applyPreset('gross')" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-blue-600 hover:text-white text-slate-200 transition shadow-sm">
+                Großschanze (HS 142)
+            </button>
+            <button onclick="applyPreset('skiflug')" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-blue-600 hover:text-white text-slate-200 transition shadow-sm">
+                Skiflug (HS 240)
+            </button>
+            <button onclick="applyPreset('mega')" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white transition shadow-sm font-bold animate-pulse">
+                ⚡ Mega-Schanze (HS 500)
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Layout -->
+    <main class="flex-1 flex overflow-hidden">
+
+        <!-- Sidebar: Categorized Parameter Sliders -->
+        <aside class="w-96 bg-slate-900 border-r border-slate-800 flex flex-col shrink-0 z-10 shadow-xl">
+            <div class="p-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur">
+                <div class="flex justify-between items-center mb-2">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Parameter (Bis 500,00 m)</h2>
+                    <button onclick="resetAllParameters()" class="text-xs text-blue-400 hover:text-blue-300 font-medium transition">
+                        ↺ Standardwerte
+                    </button>
+                </div>
+                <!-- Category Tabs -->
+                <div class="grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px] font-medium text-center">
+                    <button onclick="switchCategory('anlauf')" id="cat-btn-anlauf" class="py-1.5 rounded-md bg-blue-600 text-white font-semibold transition">Anlauf</button>
+                    <button onclick="switchCategory('tisch')" id="cat-btn-tisch" class="py-1.5 rounded-md text-slate-400 hover:text-slate-200 transition">Tisch</button>
+                    <button onclick="switchCategory('auf')" id="cat-btn-auf" class="py-1.5 rounded-md text-slate-400 hover:text-slate-200 transition">Aufsprung</button>
+                    <button onclick="switchCategory('auslauf')" id="cat-btn-auslauf" class="py-1.5 rounded-md text-slate-400 hover:text-slate-200 transition">Auslauf</button>
+                </div>
+            </div>
+
+            <!-- Parameters Sliders Scroll Container -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-5" id="slider-sections-container">
+                <!-- Dynamically Populated Slider Groups -->
+            </div>
+
+            <!-- Bottom Live Technical Metrics Card -->
+            <div class="p-4 bg-slate-950 border-t border-slate-800 space-y-2 text-xs">
+                <div class="text-[11px] font-bold uppercase tracking-wider text-blue-400 flex justify-between">
+                    <span>Flugphysik & Klassifikation</span>
+                    <span id="metric-category-tag" class="text-slate-400">Großschanze</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 font-mono">
+                    <div class="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                        <div class="text-[10px] text-slate-400 font-sans">Abfluggeschw. ($v_0$)</div>
+                        <div id="metric-v0" class="text-sm font-bold text-amber-400">26.4 m/s</div>
+                    </div>
+                    <div class="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                        <div class="text-[10px] text-slate-400 font-sans">Max. Flughöhe</div>
+                        <div id="metric-max-h" class="text-sm font-bold text-emerald-400">12.5 m</div>
+                    </div>
+                    <div class="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                        <div class="text-[10px] text-slate-400 font-sans">Flugweite (Parabel)</div>
+                        <div id="metric-flight-dist" class="text-sm font-bold text-purple-400">142.00 m</div>
+                    </div>
+                    <div class="bg-slate-900 p-2 rounded-lg border border-slate-800">
+                        <div class="text-[10px] text-slate-400 font-sans">Hill Size (HS)</div>
+                        <div id="metric-hs" class="text-sm font-bold text-blue-400">142.00 m</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Right Viewport Area: Side Profile + Top View Canvases -->
+        <div class="flex-1 flex flex-col bg-slate-950 relative overflow-hidden">
+            
+            <!-- Floating Canvas View Controls -->
+            <div class="absolute top-4 right-4 z-10 flex items-center space-x-2 bg-slate-900/90 backdrop-blur border border-slate-800 p-1.5 rounded-xl shadow-2xl">
+                <button onclick="toggleViewMode('both')" id="view-btn-both" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-600 text-white transition">Dual Ansicht</button>
+                <button onclick="toggleViewMode('profile')" id="view-btn-profile" class="px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition">Nur Profil</button>
+                <button onclick="toggleViewMode('top')" id="view-btn-top" class="px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition">Nur Draufsicht</button>
+                <div class="h-4 w-px bg-slate-800 my-auto"></div>
+                <button onclick="zoomIn()" class="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition" title="Vergrößern">➕</button>
+                <button onclick="zoomOut()" class="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition" title="Verkleinern">➖</button>
+                <button onclick="autoFitCamera()" class="p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition text-xs font-medium px-2" title="Ansicht automatisch anpassen">Auto-Fit</button>
+            </div>
+
+            <!-- Main Canvas (Profile View) -->
+            <div id="container-profile" class="flex-1 relative border-b border-slate-800/80 min-h-[50%]">
+                <div class="absolute top-3 left-4 pointer-events-none bg-slate-900/80 backdrop-blur border border-slate-800 px-3 py-1 rounded-md text-xs font-bold text-slate-300 shadow flex items-center gap-2">
+                    <span>Seitenprofil mit Physik-Flugkurve</span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-pink-500 animate-ping"></span>
+                </div>
+                <canvas id="profileCanvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+            </div>
+
+            <!-- Secondary Canvas (Top / Plan View) -->
+            <div id="container-top" class="h-56 relative bg-slate-950">
+                <div class="absolute top-3 left-4 pointer-events-none bg-slate-900/80 backdrop-blur border border-slate-800 px-3 py-1 rounded-md text-xs font-bold text-slate-300 shadow">
+                    Draufsicht (Schanzenbreiten $b_1, b_2, b_K, b_U$)
+                </div>
+                <canvas id="topCanvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+            </div>
+
+            <!-- Legend Overlay -->
+            <div class="absolute bottom-3 left-4 pointer-events-none bg-slate-900/90 backdrop-blur border border-slate-800 p-2.5 rounded-xl text-[11px] flex space-x-4 text-slate-300 shadow-xl">
+                <div class="flex items-center space-x-1.5">
+                    <span class="w-2.5 h-2.5 bg-blue-500 rounded-full inline-block"></span>
+                    <span>Anlauf</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <span class="w-2.5 h-2.5 bg-pink-500 rounded-full inline-block"></span>
+                    <span>Flugkurve (Parabel W)</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <span class="w-2.5 h-2.5 bg-amber-500 rounded-full inline-block"></span>
+                    <span>Aufsprunghang</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full inline-block"></span>
+                    <span>Auslauf</span>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- JavaScript Geometry & Physics Engine -->
+    <script>
+        /**
+         * Central Data Store: All FIS Geometry Parameters up to 500m range
+         */
+        const p = {
+            // Anlauf (Inrun)
+            e1: 108.00,    // Gesamte Anlauflänge (m)
+            e2: 88.00,     // Länge vom Beginn des Radius r1 bis Tisch (m)
+            es: 20.00,     // Anlauflänge Startschrankenbereich (m)
+            gamma: 35.00,  // Anlaufneigung (Grad)
+            r1: 105.00,    // Übergangsradius Anlauf (m)
+            
+            // Schanzentisch (Takeoff Table)
+            t: 6.70,       // Tischlänge (m)
+            alpha: 11.00,  // Tischneigung (Grad)
+            h: 60.50,      // Höhendifferenz Tisch T bis K-Punkt (m)
+            n: 108.20,     // Horizontalabstand Tisch T bis K-Punkt (m)
+            
+            // Aufsprung & Hill Size (Landing Hill)
+            w: 120.00,     // K-Punkt Weite (m)
+            hs: 142.00,    // Hill Size / L-Punkt (m)
+            p_dist: 95.00, // P-Punkt Beginn Aufsprungs zone (m)
+            beta0: 10.50,  // Aufsprungneigung direkt unter Tisch (Grad)
+            betaP: 35.50,  // Neigung P-Punkt (Grad)
+            betaK: 34.00,  // Neigung K-Punkt (Grad)
+            betaL: 31.50,  // Neigung L-Punkt (Grad)
+            rL: 280.00,    // Radius Aufsprunghang (m)
+            
+            // Auslauf (Outrun)
+            r2: 115.00,    // Auslaufradius im Gegenhang / Übergang (m)
+            zU: 132.50,    // Gesamthöhe Tisch bis tiefsten Auslaufpunkt U (m)
+            a: 110.00,     // Auslauflänge flach (m)
+            
+            // Breiten (Widths)
+            b1: 2.50,      // Anlaufbreite oben (m)
+            b2: 3.50,      // Anlaufbreite am Tisch (m)
+            bK: 18.50,     // Aufsprungbreite am K-Punkt (m)
+            bU: 22.00      // Auslaufbreite (m)
+        };
+
+        // Presets Configuration including Mega 500m Schanze
+        const PRESETS = {
+            normal: {
+                e1: 85.00, e2: 68.00, es: 17.00, gamma: 33.00, r1: 85.00,
+                t: 6.00, alpha: 10.50, h: 48.00, n: 86.00,
+                w: 95.00, hs: 106.00, p_dist: 78.00, beta0: 10.00, betaP: 34.00, betaK: 33.00, betaL: 30.50, rL: 210.00,
+                r2: 90.00, zU: 92.00, a: 90.00,
+                b1: 2.20, b2: 3.00, bK: 15.00, bU: 18.00
+            },
+            gross: {
+                e1: 108.00, e2: 88.00, es: 20.00, gamma: 35.00, r1: 105.00,
+                t: 6.70, alpha: 11.00, h: 60.50, n: 108.20,
+                w: 120.00, hs: 142.00, p_dist: 95.00, beta0: 10.50, betaP: 35.50, betaK: 34.00, betaL: 31.50, rL: 280.00,
+                r2: 115.00, zU: 132.50, a: 110.00,
+                b1: 2.50, b2: 3.50, bK: 18.50, bU: 22.00
+            },
+            skiflug: {
+                e1: 135.00, e2: 110.00, es: 25.00, gamma: 36.00, r1: 130.00,
+                t: 8.00, alpha: 11.50, h: 102.00, n: 175.00,
+                w: 200.00, hs: 240.00, p_dist: 160.00, beta0: 11.00, betaP: 38.00, betaK: 37.00, betaL: 33.00, rL: 380.00,
+                r2: 160.00, zU: 198.00, a: 150.00,
+                b1: 2.80, b2: 4.00, bK: 24.00, bU: 28.00
+            },
+            mega: {
+                e1: 320.00, e2: 260.00, es: 45.00, gamma: 36.50, r1: 300.00,
+                t: 12.00, alpha: 12.00, h: 210.00, n: 380.00,
+                w: 420.00, hs: 500.00, p_dist: 340.00, beta0: 11.50, betaP: 40.00, betaK: 39.00, betaL: 34.00, rL: 750.00,
+                r2: 320.00, zU: 410.00, a: 300.00,
+                b1: 4.00, b2: 6.00, bK: 35.00, bU: 45.00
+            }
+        };
+
+        // UI Slider Category Definitions - All length parameters allow up to 500.00m with 2 decimals
+        const SLIDER_CONFIG = [
+            { cat: 'anlauf', key: 'e1', label: 'e1: Anlauflänge gesamt', min: 20.00, max: 500.00, step: 0.50, unit: 'm' },
+            { cat: 'anlauf', key: 'e2', label: 'e2: Anlauflänge Kurve bis Tisch', min: 10.00, max: 500.00, step: 0.50, unit: 'm' },
+            { cat: 'anlauf', key: 'es', label: 'es: Anlauflänge Startbereich', min: 5.00, max: 150.00, step: 0.50, unit: 'm' },
+            { cat: 'anlauf', key: 'gamma', label: 'γ (Gamma): Anlaufneigung', min: 20.00, max: 45.00, step: 0.10, unit: '°' },
+            { cat: 'anlauf', key: 'r1', label: 'r1: Übergangsradius Anlauf', min: 30.00, max: 500.00, step: 1.00, unit: 'm' },
+
+            { cat: 'tisch', key: 't', label: 't: Tischlänge', min: 3.00, max: 25.00, step: 0.05, unit: 'm' },
+            { cat: 'tisch', key: 'alpha', label: 'α (Alpha): Tischneigung', min: 0.00, max: 20.00, step: 0.10, unit: '°' },
+            { cat: 'tisch', key: 'h', label: 'h: Höhendifferenz Tisch-K', min: 10.00, max: 500.00, step: 0.50, unit: 'm' },
+            { cat: 'tisch', key: 'n', label: 'n: Horizontalabstand Tisch-K', min: 20.00, max: 500.00, step: 0.50, unit: 'm' },
+
+            { cat: 'auf', key: 'w', label: 'w: K-Punkt Weite', min: 40.00, max: 500.00, step: 0.50, unit: 'm' },
+            { cat: 'auf', key: 'hs', label: 'HS: Hill Size (L-Punkt)', min: 50.00, max: 500.00, step: 0.50, unit: 'm' },
+            { cat: 'auf', key: 'p_dist', label: 'P: Beginn Aufsprungszone', min: 30.00, max: 500.00, step: 0.50, unit: 'm' },
+            { cat: 'auf', key: 'beta0', label: 'β0: Tisch-Abflugneigung', min: 5.00, max: 20.00, step: 0.10, unit: '°' },
+            { cat: 'auf', key: 'betaP', label: 'βP: Neigung P-Punkt', min: 20.00, max: 45.00, step: 0.10, unit: '°' },
+            { cat: 'auf', key: 'betaK', label: 'βK: Neigung K-Punkt', min: 20.00, max: 45.00, step: 0.10, unit: '°' },
+            { cat: 'auf', key: 'betaL', label: 'βL: Neigung L-Punkt', min: 15.00, max: 45.00, step: 0.10, unit: '°' },
+            { cat: 'auf', key: 'rL', label: 'rL: Radius Aufsprung', min: 50.00, max: 900.00, step: 1.00, unit: 'm' },
+
+            { cat: 'auslauf', key: 'r2', label: 'r2: Auslaufradius', min: 30.00, max: 500.00, step: 1.00, unit: 'm' },
+            { cat: 'auslauf', key: 'zU', label: 'zU: Gesamthöhe Tisch-Auslauf U', min: 20.00, max: 500.00, step: 0.50, unit: 'm' },
+            { cat: 'auslauf', key: 'a', label: 'a: Auslauflänge flach', min: 30.00, max: 500.00, step: 1.00, unit: 'm' },
+            { cat: 'auslauf', key: 'b1', label: 'b1: Anlaufbreite oben', min: 1.50, max: 10.00, step: 0.05, unit: 'm' },
+            { cat: 'auslauf', key: 'b2', label: 'b2: Anlaufbreite Tisch', min: 2.00, max: 12.00, step: 0.05, unit: 'm' },
+            { cat: 'auslauf', key: 'bK', label: 'bK: Aufsprungbreite K-Punkt', min: 10.00, max: 60.00, step: 0.20, unit: 'm' },
+            { cat: 'auslauf', key: 'bU', label: 'bU: Auslaufbreite', min: 12.00, max: 80.00, step: 0.20, unit: 'm' }
+        ];
+
+        let currentCategory = 'anlauf';
+        let viewMode = 'both';
+
+        let scale = 1.5;
+        let cameraOffset = { x: 150, y: 250 };
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+
+        const pCanvas = document.getElementById('profileCanvas');
+        const pCtx = pCanvas.getContext('2d');
+        const tCanvas = document.getElementById('topCanvas');
+        const tCtx = tCanvas.getContext('2d');
+
+        function renderSidebar() {
+            const container = document.getElementById('slider-sections-container');
+            container.innerHTML = '';
+
+            const filtered = SLIDER_CONFIG.filter(item => item.cat === currentCategory);
+
+            filtered.forEach(item => {
+                const value = p[item.key];
+                const div = document.createElement('div');
+                div.className = 'bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5 hover:border-slate-700 transition';
+                div.innerHTML = `
+                    <div class="flex justify-between items-center text-xs">
+                        <label for="slider-${item.key}" class="font-medium text-slate-300">${item.label}</label>
+                        <span id="val-${item.key}" class="font-mono font-bold text-blue-400 bg-blue-950/80 border border-blue-800/50 px-2 py-0.5 rounded">
+                            ${value.toFixed(2)} ${item.unit}
+                        </span>
+                    </div>
+                    <input type="range" id="slider-${item.key}" 
+                           min="${item.min}" max="${item.max}" step="${item.step}" value="${value}"
+                           class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                `;
+                container.appendChild(div);
+
+                const slider = div.querySelector(`#slider-${item.key}`);
+                slider.addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    p[item.key] = val;
+                    document.getElementById(`val-${item.key}`).innerText = `${val.toFixed(2)} ${item.unit}`;
+                    updateMetrics();
+                    requestRender();
+                });
+            });
+        }
+
+        function switchCategory(cat) {
+            currentCategory = cat;
+            ['anlauf', 'tisch', 'auf', 'auslauf'].forEach(c => {
+                const btn = document.getElementById(`cat-btn-${c}`);
+                if (c === cat) {
+                    btn.className = 'py-1.5 rounded-md bg-blue-600 text-white font-semibold transition';
+                } else {
+                    btn.className = 'py-1.5 rounded-md text-slate-400 hover:text-slate-200 transition';
+                }
+            });
+            renderSidebar();
+        }
+
+        function applyPreset(presetKey) {
+            if (!PRESETS[presetKey]) return;
+            Object.assign(p, PRESETS[presetKey]);
+            renderSidebar();
+            updateMetrics();
+            autoFitCamera();
+            requestRender();
+        }
+
+        function resetAllParameters() {
+            applyPreset('gross');
+        }
+
+        function calculatePhysicsFlightCurve() {
+            // Physics estimation for take-off velocity based on height drop along the inrun
+            const g = 9.81;
+            const vertDropInrun = p.e1 * Math.sin(p.gamma * Math.PI / 180) + p.h;
+            // v0 = sqrt(2 * g * effective height drop) with friction coefficient ~ 0.95
+            const v0 = Math.max(10.0, 0.95 * Math.sqrt(2 * g * vertDropInrun));
+            
+            const alphaRad = p.alpha * Math.PI / 180;
+            const v0x = v0 * Math.cos(alphaRad);
+            const v0y = v0 * Math.sin(alphaRad);
+
+            const flightPoints = [];
+            let maxFlightHeight = 0;
+            let landingDist = 0;
+
+            const dt = 0.05; // time step
+            let t = 0;
+            let currX = 0;
+            let currY = 0;
+
+            // Simulate projectile motion until it hits or passes the landing hill range
+            while (t < 15.0) {
+                currX = v0x * t;
+                currY = v0y * t - 0.5 * g * t * t;
+
+                if (currY > maxFlightHeight) maxFlightHeight = currY;
+
+                flightPoints.push({ x: currX, y: currY });
+
+                // Check intersection with landing hill curve approx
+                const hillDrop = -p.h * Math.pow(Math.max(0, currX) / Math.max(1, p.n), 1.35);
+                if (currX > 10 && currY <= hillDrop) {
+                    landingDist = currX;
+                    break;
+                }
+
+                if (currX > p.hs * 1.5) {
+                    landingDist = currX;
+                    break;
+                }
+
+                t += dt;
+            }
+
+            if (landingDist === 0) landingDist = p.w;
+
+            return { v0, maxFlightHeight, landingDist, flightPoints };
+        }
+
+        function updateMetrics() {
+            const physics = calculatePhysicsFlightCurve();
+            document.getElementById('metric-v0').innerText = `${physics.v0.toFixed(1)} m/s`;
+            document.getElementById('metric-max-h').innerText = `${physics.maxFlightHeight.toFixed(1)} m`;
+            document.getElementById('metric-flight-dist').innerText = `${physics.landingDist.toFixed(2)} m`;
+            document.getElementById('metric-hs').innerText = `${p.hs.toFixed(2)} m`;
+
+            const tag = document.getElementById('metric-category-tag');
+            if (p.hs >= 400) {
+                tag.innerText = 'Mega-Schanze (HS 500+)';
+                tag.className = 'text-purple-400 font-bold';
+            } else if (p.hs >= 185) {
+                tag.innerText = 'Skiflugschanze';
+                tag.className = 'text-indigo-400 font-bold';
+            } else if (p.hs >= 110) {
+                tag.innerText = 'Großschanze';
+                tag.className = 'text-blue-400 font-bold';
+            } else {
+                tag.innerText = 'Normalschanze';
+                tag.className = 'text-emerald-400 font-bold';
+            }
+        }
+
+        function toCanvas(cx, cy, canvasObj) {
+            return {
+                x: cameraOffset.x + cx * scale,
+                y: cameraOffset.y - cy * scale
+            };
+        }
+
+        function computeFISProfileGeometry() {
+            const points = [];
+            const markers = {};
+
+            const gammaRad = p.gamma * Math.PI / 180;
+            const alphaRad = p.alpha * Math.PI / 180;
+
+            const straightInrunLen = Math.max(0, p.e1 - p.e2);
+            const inrunTotalVert = p.e1 * Math.sin(gammaRad);
+            const inrunTotalHoriz = p.e1 * Math.cos(gammaRad);
+            
+            const ptA = { x: -inrunTotalHoriz - p.t * Math.cos(alphaRad), y: inrunTotalVert + p.t * Math.sin(alphaRad) };
+            const ptB = { x: ptA.x + p.es * Math.cos(gammaRad), y: ptA.y - p.es * Math.sin(gammaRad) };
+            const ptE1 = { x: ptA.x + straightInrunLen * Math.cos(gammaRad), y: ptA.y - straightInrunLen * Math.sin(gammaRad) };
+            const ptT = { x: 0, y: 0 };
+
+            markers.A = ptA;
+            markers.B = ptB;
+            markers.E1 = ptE1;
+            markers.T = ptT;
+
+            const inrunSteps = 60;
+            for (let i = 0; i <= inrunSteps; i++) {
+                const frac = i / inrunSteps;
+                if (frac < 0.5) {
+                    const subFrac = frac * 2;
+                    const x = ptA.x + subFrac * (ptE1.x - ptA.x);
+                    const y = ptA.y + subFrac * (ptE1.y - ptA.y);
+                    points.push({ x, y, zone: 'anlauf' });
+                } else {
+                    const subFrac = (frac - 0.5) * 2;
+                    const t = subFrac;
+                    const x = (1 - t) * ptE1.x + t * ptT.x;
+                    const y = (1 - t) * ptE1.y + t * ptT.y - Math.sin(t * Math.PI) * (p.r1 * 0.02);
+                    points.push({ x, y, zone: 'anlauf' });
+                }
+            }
+
+            points.push({ x: ptT.x, y: ptT.y, zone: 'tisch' });
+
+            const ptK = { x: p.n, y: -p.h };
+            markers.K = ptK;
+
+            const pRatio = Math.min(1.0, p.p_dist / Math.max(1, p.w));
+            const ptP = { x: p.n * pRatio * 0.9, y: -p.h * Math.pow(pRatio, 1.2) * 0.75 };
+            markers.P = ptP;
+
+            const hsRatio = p.hs / Math.max(1, p.w);
+            const ptL = { x: p.n * hsRatio, y: -p.h * Math.pow(hsRatio, 1.18) };
+            markers.L = ptL;
+
+            const hillSteps = 80;
+            for (let i = 1; i <= hillSteps; i++) {
+                const frac = i / hillSteps;
+                const currDistX = ptL.x * frac;
+                const dropNorm = Math.pow(currDistX / Math.max(1, ptK.x), 1.35);
+                const currY = -p.h * dropNorm;
+                
+                let zoneName = 'landing_P';
+                if (currDistX >= ptP.x && currDistX < ptK.x) zoneName = 'landing_zone';
+                if (currDistX >= ptK.x) zoneName = 'landing_L';
+
+                points.push({ x: currDistX, y: currY, zone: zoneName });
+            }
+
+            const ptU = { x: ptL.x + p.r2 * 0.45, y: -p.zU };
+            markers.U = ptU;
+
+            const ptOutrunEnd = { x: ptU.x + p.a, y: -p.zU };
+            markers.OutrunEnd = ptOutrunEnd;
+
+            const outrunTransSteps = 30;
+            for (let i = 1; i <= outrunTransSteps; i++) {
+                const t = i / outrunTransSteps;
+                const x = (1 - t) * ptL.x + t * ptU.x;
+                const y = (1 - t) * ptL.y + t * ptU.y - Math.sin(t * Math.PI * 0.5) * 3.0;
+                points.push({ x, y, zone: 'outrun_radius' });
+            }
+
+            points.push({ x: ptOutrunEnd.x, y: ptOutrunEnd.y, zone: 'outrun_flat' });
+
+            return { points, markers };
+        }
+
+        function renderProfileCanvas() {
+            const w = pCanvas.width = pCanvas.parentElement.clientWidth;
+            const h = pCanvas.height = pCanvas.parentElement.clientHeight;
+
+            pCtx.clearRect(0, 0, w, h);
+
+            pCtx.strokeStyle = '#1e293b';
+            pCtx.lineWidth = 1;
+            const gridSize = 40 * scale;
+            const startX = cameraOffset.x % gridSize;
+            const startY = cameraOffset.y % gridSize;
+
+            pCtx.beginPath();
+            for (let x = startX; x < w; x += gridSize) {
+                pCtx.moveTo(x, 0); pCtx.lineTo(x, h);
+            }
+            for (let y = startY; y < h; y += gridSize) {
+                pCtx.moveTo(0, y); pCtx.lineTo(w, y);
+            }
+            pCtx.stroke();
+
+            const geom = computeFISProfileGeometry();
+            const pts = geom.points;
+            const m = geom.markers;
+
+            if (pts.length > 0) {
+                pCtx.beginPath();
+                const p0 = toCanvas(pts[0].x, pts[0].y, pCanvas);
+                pCtx.moveTo(p0.x, p0.y);
+                for (let i = 1; i < pts.length; i++) {
+                    const cp = toCanvas(pts[i].x, pts[i].y, pCanvas);
+                    pCtx.lineTo(cp.x, cp.y);
+                }
+                const pLast = toCanvas(pts[pts.length - 1].x, pts[pts.length - 1].y, pCanvas);
+                pCtx.lineTo(pLast.x, h);
+                pCtx.lineTo(p0.x, h);
+                pCtx.closePath();
+
+                const fillGrad = pCtx.createLinearGradient(0, 0, 0, h);
+                fillGrad.addColorStop(0, '#1e3a8a');
+                fillGrad.addColorStop(1, '#020617');
+                pCtx.fillStyle = fillGrad;
+                pCtx.fill();
+            }
+
+            for (let i = 0; i < pts.length - 1; i++) {
+                const p1 = toCanvas(pts[i].x, pts[i].y, pCanvas);
+                const p2 = toCanvas(pts[i + 1].x, pts[i + 1].y, pCanvas);
+
+                pCtx.beginPath();
+                pCtx.moveTo(p1.x, p1.y);
+                pCtx.lineTo(p2.x, p2.y);
+
+                if (pts[i].zone === 'anlauf') pCtx.strokeStyle = '#3b82f6';
+                else if (pts[i].zone === 'tisch') pCtx.strokeStyle = '#22d3ee';
+                else if (pts[i].zone === 'landing_zone') pCtx.strokeStyle = '#f59e0b';
+                else if (pts[i].zone === 'outrun_flat') pCtx.strokeStyle = '#10b981';
+                else pCtx.strokeStyle = '#64748b';
+
+                pCtx.lineWidth = 3.5;
+                pCtx.stroke();
+            }
+
+            // Render Physics Flight Curve (Parabola W)
+            const physics = calculatePhysicsFlightCurve();
+            if (physics.flightPoints.length > 1) {
+                pCtx.beginPath();
+                const startPt = toCanvas(physics.flightPoints[0].x, physics.flightPoints[0].y, pCanvas);
+                pCtx.moveTo(startPt.x, startPt.y);
+
+                for (let i = 1; i < physics.flightPoints.length; i++) {
+                    const fp = toCanvas(physics.flightPoints[i].x, physics.flightPoints[i].y, pCanvas);
+                    pCtx.lineTo(fp.x, fp.y);
+                }
+                pCtx.strokeStyle = '#ec4899'; // Vibrant pink for flight parabola
+                pCtx.lineWidth = 3.0;
+                pCtx.setLineDash([6, 3]);
+                pCtx.stroke();
+                pCtx.setLineDash([]); // Reset line dash
+            }
+
+            const cT = toCanvas(m.T.x, m.T.y, pCanvas);
+            drawMarker(cT.x, cT.y, 'T', '#22d3ee');
+
+            const cA = toCanvas(m.A.x, m.A.y, pCanvas);
+            drawMarker(cA.x, cA.y, 'A (Start)', '#3b82f6');
+
+            const cK = toCanvas(m.K.x, m.K.y, pCanvas);
+            drawMarker(cK.x, cK.y, `K-Punkt (${p.w.toFixed(1)}m)`, '#f59e0b');
+
+            const cL = toCanvas(m.L.x, m.L.y, pCanvas);
+            drawMarker(cL.x, cL.y, `HS (${p.hs.toFixed(1)}m)`, '#ef4444');
+
+            const cU = toCanvas(m.U.x, m.U.y, pCanvas);
+            drawMarker(cU.x, cU.y, 'U', '#10b981');
+        }
+
+        function renderTopCanvas() {
+            const w = tCanvas.width = tCanvas.parentElement.clientWidth;
+            const h = tCanvas.height = tCanvas.parentElement.clientHeight;
+
+            tCtx.clearRect(0, 0, w, h);
+
+            const centerY = h / 2;
+            const geom = computeFISProfileGeometry();
+            const m = geom.markers;
+
+            const xA = cameraOffset.x + m.A.x * scale;
+            const xT = cameraOffset.x + m.T.x * scale;
+            const xK = cameraOffset.x + m.K.x * scale;
+            const xU = cameraOffset.x + m.U.x * scale;
+            const xEnd = cameraOffset.x + m.OutrunEnd.x * scale;
+
+            const hw1 = (p.b1 / 2) * scale * 2.0;
+            const hw2 = (p.b2 / 2) * scale * 2.0;
+            const hwK = (p.bK / 2) * scale * 2.0;
+            const hwU = (p.bU / 2) * scale * 2.0;
+
+            tCtx.beginPath();
+            tCtx.moveTo(xA, centerY - hw1);
+            tCtx.lineTo(xT, centerY - hw2);
+            tCtx.lineTo(xK, centerY - hwK);
+            tCtx.lineTo(xU, centerY - hwU);
+            tCtx.lineTo(xEnd, centerY - hwU);
+            tCtx.lineTo(xEnd, centerY + hwU);
+            tCtx.lineTo(xU, centerY + hwU);
+            tCtx.lineTo(xK, centerY + hwK);
+            tCtx.lineTo(xT, centerY + hw2);
+            tCtx.lineTo(xA, centerY + hw1);
+            tCtx.closePath();
+
+            const grad = tCtx.createLinearGradient(xA, 0, xEnd, 0);
+            grad.addColorStop(0, '#1e3a8a');
+            grad.addColorStop(0.3, '#0284c7');
+            grad.addColorStop(0.7, '#d97706');
+            grad.addColorStop(1, '#059669');
+            tCtx.fillStyle = grad;
+            tCtx.fill();
+
+            tCtx.strokeStyle = '#94a3b8';
+            tCtx.lineWidth = 2;
+            tCtx.stroke();
+        }
+
+        function drawMarker(x, y, label, color) {
+            pCtx.fillStyle = color;
+            pCtx.beginPath();
+            pCtx.arc(x, y, 4, 0, 2 * Math.PI);
+            pCtx.fill();
+
+            pCtx.fillStyle = '#f8fafc';
+            pCtx.font = 'bold 10px Inter';
+            pCtx.fillText(label, x + 6, y - 4);
+        }
+
+        function requestRender() {
+            requestAnimationFrame(() => {
+                renderProfileCanvas();
+                renderTopCanvas();
+            });
+        }
+
+        function autoFitCamera() {
+            scale = Math.max(0.3, Math.min(3.5, 300 / Math.max(150, p.hs)));
+            cameraOffset = { x: 120, y: pCanvas.height * 0.75 };
+            requestRender();
+        }
+
+        function zoomIn() { scale *= 1.25; requestRender(); }
+        function zoomOut() { scale /= 1.25; requestRender(); }
+
+        function toggleViewMode(mode) {
+            viewMode = mode;
+            const containerP = document.getElementById('container-profile');
+            const containerT = document.getElementById('container-top');
+
+            ['both', 'profile', 'top'].forEach(m => {
+                const btn = document.getElementById(`view-btn-${m}`);
+                if (m === mode) {
+                    btn.className = 'px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-600 text-white transition';
+                } else {
+                    btn.className = 'px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition';
+                }
+            });
+
+            if (mode === 'both') {
+                containerP.style.display = 'block';
+                containerT.style.display = 'block';
+            } else if (mode === 'profile') {
+                containerP.style.display = 'block';
+                containerT.style.display = 'none';
+            } else {
+                containerP.style.display = 'none';
+                containerT.style.display = 'block';
+            }
+            requestRender();
+        }
+
+        [pCanvas, tCanvas].forEach(canvas => {
+            canvas.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                dragStart = { x: e.clientX, y: e.clientY };
+            });
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            cameraOffset.x += e.clientX - dragStart.x;
+            cameraOffset.y += e.clientY - dragStart.y;
+            dragStart = { x: e.clientX, y: e.clientY };
+            requestRender();
+        });
+
+        window.addEventListener('mouseup', () => { isDragging = false; });
+
+        pCanvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (e.deltaY < 0) zoomIn();
+            else zoomOut();
+        });
+
+        window.addEventListener('resize', () => {
+            requestRender();
+        });
+
+        window.onload = function() {
+            renderSidebar();
+            updateMetrics();
+            autoFitCamera();
+        };
+    </script>
+</body>
+</html>
